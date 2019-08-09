@@ -38,7 +38,6 @@ def main(args):
   # save model weights
   vae.save_weights(WEIGHT_FILE_NAME)
 
-
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description=('Train VAE'))
   parser.add_argument('--new_model', action='store_true', help='start a new model from scratch?')

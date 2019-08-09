@@ -42,7 +42,7 @@ class VAE():
 
         self.input_dim = INPUT_DIM
         self.z_dim = Z_DIM
-        self.learning_rate = LEARNING_RATE
+        # self.learning_rate = LEARNING_RATE
         self.kl_tolerance = KL_TOLERANCE
 
     def _build(self):

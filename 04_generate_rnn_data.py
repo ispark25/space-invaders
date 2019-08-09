@@ -1,103 +1,54 @@
 #python 03_generate_rnn_data.py
 
-from vae.arch import VAE
-import argparse
-import config
+from vae.arch import VAE, load_vae
 import numpy as np
 import os
 
-ROOT_DIR_NAME = "./data/"
-ROLLOUT_DIR_NAME = "./data/rollout/"
-SERIES_DIR_NAME = "./data/series/"
+ROOT_DIR_NAME = './data/'
+INPUT_DIR_NAME = './data/vae_food/'
+OUTPUT_DIR_NAME = './data/rnn_food/'
 
-
-def get_filelist(N):
-    filelist = os.listdir(ROLLOUT_DIR_NAME)
-    filelist = [x for x in filelist if x != '.DS_Store']
-    filelist.sort()
-    length_filelist = len(filelist)
-
-
-    if length_filelist > N:
-      filelist = filelist[:N]
-
-    if length_filelist < N:
-      N = length_filelist
-
-    return filelist, N
-
-def encode_episode(vae, episode):
-
-    obs = episode['obs']
-    action = episode['action']
-    reward = episode['reward']
-    done = episode['done']
-
-    done = done.astype(int)  
-    reward = np.where(reward>0, 1, 0) * np.where(done==0, 1, 0)
-
-    mu, log_var = vae.encoder_mu_log_var.predict(obs)
-    
-    initial_mu = mu[0, :]
-    initial_log_var = log_var[0, :]
-
-    return (mu, log_var, action, reward, done, initial_mu, initial_log_var)
-
-
+VAE_WEIGHT_FILE_NAME = './vae/weight/...'
 
 def main(args):
+    vae = load_vae(VAE_WEIGHT_FILE_NAME)
 
-    N = args.N
+    files = os.listdir(INPUT_DIR_NAME)
+    nb_files = len(files)
+    nb_encoded = 0
 
-    vae = VAE()
+    init_mus = []
+    init_lvs = []
 
-    try:
-      vae.set_weights('./vae/weights.h5')
-    except:
-      print("./vae/weights.h5 does not exist - ensure you have run 02_train_vae.py first")
-      raise
+    for filename in files:
+        episode_data = np.load(INPUT_DIR_NAME + filename)
 
+        mu, lv = vae.encoder_mu_log_var.predict(episode_data['obs'])
 
-    filelist, N = get_filelist(N)
+        init_mus.append(mu[0, :]) # mu[i, :] = mu vector for i-th episode
+        init_lvs.append(lv[0, :]) # lv[i, :] = log_var vector for i-th episode
 
-    file_count = 0
+        np.savez_compressed(OUTPUT_DIR_NAME + file, 
+            mu=mu, 
+            lv=lv, 
+            action = episode_data['action'], 
+            reward = episode_data['reward'], 
+            done = episode_data['done'].astype(int)) # TODO: why?
 
-    initial_mus = []
-    initial_log_vars = []
+        # Log progress
+        nb_encoded += 1
+        if nb_encoded % 100 == 0:
+            print(f'Encoded {count} / {nb_files} episodes')
+    print(f'Encoded {count} / {nb_files} episodes')
 
-    for file in filelist:
-      try:
-      
-        rollout_data = np.load(ROLLOUT_DIR_NAME + file)
-
-        mu, log_var, action, reward, done, initial_mu, initial_log_var = encode_episode(vae, rollout_data)
-
-        np.savez_compressed(SERIES_DIR_NAME + file, mu=mu, log_var=log_var, action = action, reward = reward, done = done)
-        initial_mus.append(initial_mu)
-        initial_log_vars.append(initial_log_var)
-
-        file_count += 1
-
-        if file_count%50==0:
-          print('Encoded {} / {} episodes'.format(file_count, N))
-
-      except:
-        print('Skipped {}...'.format(file))
-
-    print('Encoded {} / {} episodes'.format(file_count, N))
-
-    initial_mus = np.array(initial_mus)
-    initial_log_vars = np.array(initial_log_vars)
+    init_mus = np.array(init_mus)
+    init_lvs = np.array(init_lvs)
 
     print('ONE MU SHAPE = {}'.format(mu.shape))
     print('INITIAL MU SHAPE = {}'.format(initial_mus.shape))
 
-    np.savez_compressed(ROOT_DIR_NAME + 'initial_z.npz', initial_mu=initial_mus, initial_log_var=initial_log_vars)
+    np.savez_compressed(ROOT_DIR_NAME + 'initial_z.npz', init_mus=init_mus, init_lvs=init_lvs) # TODO: what for?
 
     
-if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description=('Generate RNN data'))
-  parser.add_argument('--N',default = 10000, help='number of episodes to use to train')
-  args = parser.parse_args()
-
-  main(args)
+if __name__ == '__main__':
+    main()

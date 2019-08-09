@@ -48,7 +48,6 @@ def random_batch(filelist, batch_size):
 			reward = np.expand_dims(reward, axis=2)
 			done = np.expand_dims(done, axis=2)
 
-
 			s = log_var.shape
 
 			z = mu + np.exp(log_var/2.0) * np.random.randn(*s)

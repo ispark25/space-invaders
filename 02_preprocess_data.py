@@ -1,52 +1,51 @@
-#python 02_train_vae.py --new_model
-
-from vae.arch2 import VAE
-import argparse
 import numpy as np
 import os
-from vae.data_loader import get_generators
+import sys
+from skimage.measure import block_reduce
+from skimage.transform import resize
+import argparse
 
-DIR_NAME = './data/rollout_processed/'
-WEIGHT_FILE = './vae/adam_64_heU_plus_bigR_0Tol.h5'
-SCREEN_SIZE_X = 64
-SCREEN_SIZE_Y = 64
-TV_RATIO = 0.2
+def preprocess(root, dest, a, b):
+    for filename in os.listdir(root):
+        
+        number = to_number(filename)
+        if not (a <= number and number < b):
+            continue
+        
+        samples = np.load(root + filename)
+        obs = batch_downsample(samples['obs'])
 
-from datetime import datetime
-from keras.callbacks import TensorBoard
-def main(args):
-  exec_time = datetime.now().strftime('%Y%m%d-%H%M%S')
-  tensorboard = TensorBoard(log_dir=f'log/vae/{exec_time}', update_freq='batch')
+        np.savez_compressed(dest + filename, 
+                            obs=obs,
+                            action=samples['action'],
+                            reward=samples['reward'],
+                            done=samples['done'])
+        print(f'Saved {filename}')
+    print('Finished!')
 
-  new_model = args.new_model
-  epochs = int(args.epochs)
-  steps = int(args.steps)
+def batch_downsample(batch):
+    batch_size = len(batch)
+    crop = batch[:, 9:-9, 16:-16]
+    
+    blurry = resize(crop, (batch_size, 64, 64, 3), mode='constant')
+    blocky = block_reduce(crop, (1,3,2,1), np.max)
+    
+    for i in range(batch_size):
+        if np.count_nonzero(blurry[i, :4, 32:, 0]) > 48:
+            blurry[i, :4, :] = 0
+    
+    blurry[blocky[:,:,:,0] == 142] = 1.0
+    return blurry
 
-  vae = VAE()
-
-  if not new_model:
-    try:
-      vae.set_weights(WEIGHT_FILE)
-    except:
-      print(f'Either set --new_model or ensure {WEIGHT_FILE} exists')
-      raise
-  
-  t_gen, v_gen = get_generators(DIR_NAME, TV_RATIO)
-  #steps per epoch
-  vae.train(t_gen, v_gen, 
-    epochs=epochs, 
-    steps_per_epoch=steps,
-    validation_steps=int(steps * TV_RATIO),
-    workers=10,
-    callbacks=[tensorboard])
-  
-  vae.save_weights(WEIGHT_FILE)
+def to_number(filename):
+    return int(filename[:-4])
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description=('Train VAE'))
-  parser.add_argument('--new_model', action='store_true', help='start a new model from scratch?')
-  parser.add_argument('--epochs', default = 10, help='number of epochs to train for')
-  parser.add_argument('--steps', default = 1000, help='number of steps per epoch')
-  args = parser.parse_args()
-
-  main(args)
+    # 2^31 -1 = 2,147,483,647 --> 500,000,000
+    parser = argparse.ArgumentParser(description=('Preprocess data'))
+    parser.add_argument('--start', type=int, default=0,
+                        help='where to start preprocessing from')
+    parser.add_argument('--end', type=int, default=3000000000,
+                        help='where to stop preprocessing (exclusive)')
+    args = parser.parse_args()
+    preprocess('data/raw_food/', 'data/vae_food/', args.start, args.end)

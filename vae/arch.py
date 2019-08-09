@@ -2,7 +2,6 @@ import numpy as np
 
 from keras.layers import Input, Conv2D, Flatten, Dense, Conv2DTranspose, Lambda, Reshape, Activation
 from keras.models import Model
-from keras.optimizers import Adam
 from keras import backend as K
 
 INPUT_DIM = (64,64,3)
@@ -23,16 +22,14 @@ CONV_T_INITS = ['he_uniform','he_uniform','he_uniform','he_uniform']
 
 Z_DIM = 64
 
-LEARNING_RATE = 0.0001
-KL_TOLERANCE = 0.5 * 64 * 64 # reduce this value!
-
+KL_TOLERANCE = 0.5 * 64 * 64  # TODO reduce this value!
 
 def sampling(args):
     z_mean, z_sigma = args
     epsilon = K.random_normal(shape=K.shape(z_sigma), mean=0.,stddev=1.)
     return z_mean + z_sigma * epsilon
 
-def convert_to_sigma(z_log_var):
+def to_sigma(z_log_var):
     return K.exp(z_log_var * 0.5)
 
 class VAE():
@@ -58,8 +55,8 @@ class VAE():
         vae_z_in = Flatten()(vae_c4)
 
         vae_z_mean = Dense(Z_DIM, name='mu')(vae_z_in)
-        vae_z_log_var = Dense(Z_DIM, name='log_var')(vae_z_in) #try TODO: positive bias or softplus on log_var!
-        vae_z_sigma = Activation('softplus')(Lambda(convert_to_sigma, name='sigma')(vae_z_log_var))
+        vae_z_log_var = Dense(Z_DIM, name='log_var')(vae_z_in)
+        vae_z_sigma = Activation('softplus')(Lambda(to_sigma, name='sigma')(vae_z_log_var)) # TODO mention!
 
         vae_z = Lambda(sampling, name='z')([vae_z_mean, vae_z_sigma])
         
@@ -67,7 +64,7 @@ class VAE():
 
         #### DECODER: we instantiate these layers separately so as to reuse them later
         vae_dense = Dense(DENSE_SIZE, name='dense_layer')
-        vae_z_out = Reshape((1,1,DENSE_SIZE), name='unflatten')
+        vae_z_out = Reshape((1, 1, DENSE_SIZE), name='unflatten')
         vae_d1 = Conv2DTranspose(filters = CONV_T_FILTERS[0], kernel_size = CONV_T_KERNEL_SIZES[0] , strides = CONV_T_STRIDES[0], activation=CONV_T_ACTIVATIONS[0], kernel_initializer=CONV_T_INITS[0], name='deconv_layer_1')
         vae_d2 = Conv2DTranspose(filters = CONV_T_FILTERS[1], kernel_size = CONV_T_KERNEL_SIZES[1] , strides = CONV_T_STRIDES[1], activation=CONV_T_ACTIVATIONS[1], kernel_initializer=CONV_T_INITS[1], name='deconv_layer_2')
         vae_d3 = Conv2DTranspose(filters = CONV_T_FILTERS[2], kernel_size = CONV_T_KERNEL_SIZES[2] , strides = CONV_T_STRIDES[2], activation=CONV_T_ACTIVATIONS[2], kernel_initializer=CONV_T_INITS[2], name='deconv_layer_3')
@@ -98,26 +95,23 @@ class VAE():
         vae_decoder = Model(vae_z_input, vae_d4_decoder)
 
         def vae_r_loss(y_true, y_pred):
-            ######## y_true.shape = (batch size, 3, 64, 64)
-            r_loss = K.sum(K.square(y_true - y_pred), axis = [1,2,3]) * (64 * 64 * 3)
+            r_loss = K.sum(K.square(y_true - y_pred), axis = [1,2,3]) * (64 * 64 * 3) # TODO mention!
             return r_loss
 
         def vae_kl_loss(y_true, y_pred):
-            kl_loss = - 0.5 * K.sum(1 + vae_z_log_var - K.square(vae_z_mean) - K.exp(vae_z_log_var), axis = 1)
+            kl_loss = -0.5 * K.sum(1 + vae_z_log_var - K.square(vae_z_mean) - K.exp(vae_z_log_var), axis = 1)
             kl_loss = K.maximum(kl_loss, KL_TOLERANCE * Z_DIM)
             return kl_loss
 
         def vae_loss(y_true, y_pred):
             return vae_r_loss(y_true, y_pred) + vae_kl_loss(y_true, y_pred)
         
-        # opti = Adam(lr=LEARNING_RATE)
-        vae_full.compile(optimizer='adam', loss=vae_loss,  metrics=[vae_r_loss, vae_kl_loss])
-
+        vae_full.compile(optimizer='adam', loss=vae_loss,  metrics=[vae_r_loss, vae_kl_loss]) 
         return (vae_full, vae_encoder, vae_encoder_mu_log_var, vae_decoder)
     
     def train(self, t_gen, v_gen, **kwargs):
         self.full_model.summary()
-        self.full_model.fit_generator(t_gen, validation_data=v_gen, shuffle=True, **kwargs)
+        self.full_model.fit_generator(t_gen, validation_data=v_gen, shuffle=True, **kwargs) # TODO mention!
 
     def set_weights(self, filepath):
         self.full_model.load_weights(filepath)
@@ -125,16 +119,14 @@ class VAE():
     def save_weights(self, filepath):
         self.full_model.save_weights(filepath)
 
+    def save_encoder_weights(self, filepath):
+        self.encoder.save_weights(filepath)
 
-    # def train(self, t_gen, v_gen, steps_per_epoch, epochs, workers=1, callbacks=None):
-    #     self.full_model.fit_generator(
-    #         t_gen, 
-    #         validation_data = v_gen,
-    #         steps_per_epoch = steps_per_epoch
-    #         epochs = epochs,
-    #         workers = workers
-    #         callbakcs = callbacks or [],
-    #         shuffle = True)
-
-    # def show_summary(self):
-    #     self.full_model.summary()
+def load_vae(filename):
+    vae = VAE()
+    try:
+        vae.set_weights(filename)
+    except:
+        print(f'ERROR: {filename} does not exist')
+        raise
+    return vae

@@ -59,7 +59,7 @@ class DataGenerator(Sequence):
 
     def _load_data(self, idx):
         filename = self.filenames[idx]
-        return np.load(self.root + filename)['bullet_emphasised']
+        return np.load(self.root + filename)['obs']
 
     def __data_generation(self, subindices):
         'Generates data containing batch_size samples'

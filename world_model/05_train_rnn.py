@@ -29,7 +29,7 @@ def get_filelist(N):
     return filelist, N
 
 
-def random_batch(filelist, batch_size):
+def random_batch(filelist, batch_size=100, seq_length=300):
 
     ROOT_DIR_NAME = args.root_dir_name
     SERIES_DIR_NAME = args.series_dir_name
@@ -37,44 +37,46 @@ def random_batch(filelist, batch_size):
     N_data = len(filelist)
     indices = np.random.permutation(N_data)[0:batch_size]
 
-    z_list = np.array([])
-    action_list = np.array([])
-    rew_list = np.array([])
-    done_list = np.array([])
+    print(indices)
+
+    z_list = []
+    action_list =[]
+    rew_list = []
+    done_list = []
 
     for i in indices:
-        try:
-            new_data = np.load(SERIES_DIR_NAME + filelist[i])
+        # try:
+        new_data = np.load(SERIES_DIR_NAME + filelist[i])
 
-            mu = new_data['mu']
-            log_var = new_data['lv'] # 'log_var is not a file in the archive'
-            action = new_data['action']
-            reward = new_data['reward']
-            done = new_data['done']
+        mu = new_data['mu']
+        log_var = new_data['lv'] # 'log_var is not a file in the archive'
+        action = new_data['action']
+        reward = new_data['reward']
+        done = new_data['done']
 
-            action = np.expand_dims(action, axis=2)
-            reward = np.expand_dims(reward, axis=2)
-            done = np.expand_dims(done, axis=2)
+        action = np.expand_dims(action, axis=2)
+        reward = np.expand_dims(reward, axis=2)
+        done = np.expand_dims(done, axis=2)
 
-            print("mu:{}, lv:{}, action:{}, reward:{}, done:{}.".format(np.shape(mu),np.shape(log_var),np.shape(action),np.shape(reward),np.shape(done)))
+        print("mu:{}, lv:{}, action:{}, reward:{}, done:{}.".format(np.shape(mu),np.shape(log_var),np.shape(action),np.shape(reward),np.shape(done)))
 
-            s = log_var.shape
+        s = log_var.shape
 
-            z = mu + np.exp(log_var/2.0) * np.random.randn(*s)
+        z = mu + np.exp(log_var/2.0) * np.random.randn(*s)
 
-            z_list.append(z)
-            action_list.append(action)
-            rew_list.append(reward)
-            done_list.append(done)
+        z_list.append(z)
+        action_list.append(action)
+        rew_list.append(reward)
+        done_list.append(done)
 
-        except:
-            print("an error occured for {}".format(i))
-            pass
+        # except:
+        #     print("an error occured for {}".format(i))
+        #     pass
 
-    # z_list = np.array(z_list)
-    # action_list = np.array(action_list)
-    # rew_list = np.array(rew_list)
-    # done_list = np.array(done_list)
+    z_list = np.array(z_list)
+    action_list = np.array(action_list)
+    rew_list = np.array(rew_list)
+    done_list = np.array(done_list)
 
     print("z:{}, action:{}, reward:{}, done:{}.".format(np.shape(z_list),np.shape(action_list),np.shape(rew_list),np.shape(done_list)))
 
@@ -90,12 +92,13 @@ def main(args):
     N = int(args.N)
     steps = int(args.steps)
     batch_size = int(args.batch_size)
+    seq_length = int(args.seq_length)
 
     rnn = RNN() #learning_rate = LEARNING_RATE
 
     if not new_model:
         try:
-            rnn.set_weights(arg.rnn_weights)
+            rnn.set_weights(args.rnn_weights)
         except:
             print("Either set --new_model or ensure ./rnn/weights.h5 exists")
             raise
@@ -107,7 +110,7 @@ def main(args):
     for step in range(steps):
         print('STEP ' + str(step))
 
-        z, action, rew ,done = random_batch(filelist, batch_size)
+        z, action, rew ,done = random_batch(filelist, batch_size, seq_length)
 
         print("shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z),np.shape(action),np.shape(rew),np.shape(done)))
 
@@ -135,6 +138,7 @@ if __name__ == "__main__":
     parser.add_argument('--new_model', action='store_true', help='start a new model from scratch?')
     parser.add_argument('--steps', default = 4000, help='how many rnn batches to train over')
     parser.add_argument('--batch_size', default = 100, help='how many episodes in a batch?')
+    parser.add_argument('--seq_length', default = 300, help='how long is a sequence?')
     parser.add_argument('--root_dir_name', default='./world_model/data/',
                         help='Directory name of root.')
     parser.add_argument('--series_dir_name', default='./world_model/data/rnn_food/',

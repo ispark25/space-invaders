@@ -40,7 +40,7 @@ def main(args):
 
         repeat = np.random.randint(1, 11)
         t = 0
-        while t < time_steps and not done:
+        while t < time_steps and not done: # this is a bug, see TODO below
             if t % repeat == 0:
                 action = generate_data_action(t, env)  # <2>
                 repeat = np.random.randint(1, 11)
@@ -52,6 +52,9 @@ def main(args):
             action_seq.append(action)
             reward_seq.append(reward)
             done_seq.append(done)
+
+            # if done:
+            #     break # TODO this is the fix for done, but data is already created
 
             # Next
             observation, reward, done, info = env.step(action)  # <4>

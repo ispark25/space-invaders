@@ -1,7 +1,7 @@
 import math
 import numpy as np
 
-from keras.layers import Input, LSTM, Dense
+from keras.layers import Input, LSTM, Dense, TimeDistributed
 from keras.models import Model
 from keras import backend as K
 from keras.callbacks import EarlyStopping
@@ -11,8 +11,10 @@ from keras.optimizers import Adam
 
 import tensorflow as tf
 
-Z_DIM = 32
-ACTION_DIM = 3
+import mdn
+
+Z_DIM = 64 # 32
+ACTION_DIM = 6 # 3
 
 HIDDEN_UNITS = 256
 GAUSSIAN_MIXTURES = 5
@@ -31,6 +33,8 @@ class RNN():
 		
 		self.z_dim = Z_DIM
 		self.action_dim = ACTION_DIM
+		self.latent_dims = Z_DIM + ACTION_DIM + 1 # z(64), action(6), reward(1)
+		self.output_dims = Z_DIM + ACTION_DIM + 1 + 1 # z(64), action(6), reward(1), done(1)
 		self.hidden_units = HIDDEN_UNITS
 		self.gaussian_mixtures = GAUSSIAN_MIXTURES
 		#self.restart_factor = RESTART_FACTOR
@@ -38,79 +42,90 @@ class RNN():
 		self.learning_rate = LEARNING_RATE
 
 		self.models = self._build()
-		self.model = self.models[0]
-		self.forward = self.models[1]
+		self.model = self.models
+		# self.forward = self.models[1]
 
 
 	def _build(self):
 
-		#### THE MODEL THAT WILL BE TRAINED
-		rnn_x = Input(shape=(None, Z_DIM + ACTION_DIM + 1))
-		lstm = LSTM(HIDDEN_UNITS, return_sequences=True, return_state = True)
+		inputs = Input(shape=(None, self.latent_dims), name = 'inputs')
+		lstm_out = LSTM(self.hidden_units, name = 'lstm', return_sequences = True)(inputs)
+		mdn_out = TimeDistributed(mdn.MDN(self.output_dims, GAUSSIAN_MIXTURES, name='mdn_outputs'), name = 'td-mdn')(lstm_out)
 
-		lstm_output_model, _ , _ = lstm(rnn_x)
-		mdn = Dense(GAUSSIAN_MIXTURES * (3*Z_DIM) + 1) 
+		modelM = Model(inputs = inputs, outputs = mdn_out)
+		modelM.compile(loss = mdn.get_mixture_loss_func(self.output_dims, GAUSSIAN_MIXTURES), optimizer='adam')
+		modelM.summary()
 
-		mdn_model = mdn(lstm_output_model)
 
-		model = Model(rnn_x, mdn_model)
+		# #### THE MODEL THAT WILL BE TRAINED
+		# rnn_x = Input(shape=(None, Z_DIM + ACTION_DIM + 1))
+		# lstm = LSTM(HIDDEN_UNITS, return_sequences=True, return_state = True)
 
-		#### THE MODEL USED DURING PREDICTION
-		state_input_h = Input(shape=(HIDDEN_UNITS,))
-		state_input_c = Input(shape=(HIDDEN_UNITS,))
+		# lstm_output_model, _ , _ = lstm(rnn_x)
+		# mdn = Dense(GAUSSIAN_MIXTURES * (3*Z_DIM) + 1) 
 
-		lstm_output_forward , state_h, state_c = lstm(rnn_x, initial_state = [state_input_h, state_input_c])
+		# mdn_model = mdn(lstm_output_model)
 
-		mdn_forward = mdn(lstm_output_forward)
+		# model = Model(rnn_x, mdn_model)
 
-		forward = Model([rnn_x] + [state_input_h, state_input_c], [mdn_forward, state_h, state_c])
+		# #### THE MODEL USED DURING PREDICTION
+		# state_input_h = Input(shape=(HIDDEN_UNITS,))
+		# state_input_c = Input(shape=(HIDDEN_UNITS,))
+
+		# lstm_output_forward , state_h, state_c = lstm(rnn_x, initial_state = [state_input_h, state_input_c])
+
+		# mdn_forward = mdn(lstm_output_forward)
+
+		# forward = Model([rnn_x] + [state_input_h, state_input_c], [mdn_forward, state_h, state_c])
 
 		#### LOSS FUNCTION
 
-		def rnn_z_loss(y_true, y_pred):
+		# def rnn_z_loss(y_true, y_pred):
 			
-			z_true, rew_true = self.get_responses(y_true) 
+		# 	z_true, rew_true = self.get_responses(y_true) 
 
-			d = GAUSSIAN_MIXTURES * Z_DIM
-			z_pred = y_pred[:,:,:(3*d)]
-			z_pred = K.reshape(z_pred, [-1, GAUSSIAN_MIXTURES * 3])
+		# 	d = GAUSSIAN_MIXTURES * Z_DIM
+		# 	z_pred = y_pred[:,:,:(3*d)]
+		# 	z_pred = K.reshape(z_pred, [-1, GAUSSIAN_MIXTURES * 3])
 
-			log_pi, mu, log_sigma = self.get_mixture_coef(z_pred)
+		# 	log_pi, mu, log_sigma = self.get_mixture_coef(z_pred)
 
-			flat_z_true = K.reshape(z_true,[-1, 1])
+		# 	flat_z_true = K.reshape(z_true,[-1, 1])
 
-			z_loss = log_pi + self.tf_lognormal(flat_z_true, mu, log_sigma)
-			z_loss = -K.log(K.sum(K.exp(z_loss), 1, keepdims=True))
+		# 	z_loss = log_pi + self.tf_lognormal(flat_z_true, mu, log_sigma)
+		# 	z_loss = -K.log(K.sum(K.exp(z_loss), 1, keepdims=True))
 
-			z_loss = K.mean(z_loss) 
+		# 	z_loss = K.mean(z_loss) 
 
-			return z_loss
+		# 	return z_loss
 
-		def rnn_rew_loss(y_true, y_pred):
+		# def rnn_rew_loss(y_true, y_pred):
 		
-			z_true, rew_true = self.get_responses(y_true) #, done_true
+		# 	z_true, rew_true = self.get_responses(y_true) #, done_true
 
-			d = GAUSSIAN_MIXTURES * Z_DIM
-			reward_pred = y_pred[:,:,-1]
+		# 	d = GAUSSIAN_MIXTURES * Z_DIM
+		# 	reward_pred = y_pred[:,:,-1]
 
-			rew_loss =  K.binary_crossentropy(rew_true, reward_pred, from_logits = True)
+		# 	rew_loss =  K.binary_crossentropy(rew_true, reward_pred, from_logits = True)
 			
-			rew_loss = K.mean(rew_loss)
+		# 	rew_loss = K.mean(rew_loss)
 
-			return rew_loss
+		# 	return rew_loss
 
-		def rnn_loss(y_true, y_pred):
+		# def rnn_loss(y_true, y_pred):
 
-			z_loss = rnn_z_loss(y_true, y_pred)
-			rew_loss = rnn_rew_loss(y_true, y_pred)
+		# 	z_loss = rnn_z_loss(y_true, y_pred)
+		# 	rew_loss = rnn_rew_loss(y_true, y_pred)
 
-			return Z_FACTOR * z_loss + REWARD_FACTOR * rew_loss
+		# 	return Z_FACTOR * z_loss + REWARD_FACTOR * rew_loss
 
-		opti = Adam(lr=LEARNING_RATE)
-		model.compile(loss=rnn_loss, optimizer=opti, metrics = [rnn_z_loss, rnn_rew_loss]) #, rnn_done_loss
+		# opti = Adam(lr=LEARNING_RATE)
+		# model.compile(loss=rnn_loss, optimizer=opti, metrics = [rnn_z_loss, rnn_rew_loss]) #, rnn_done_loss
 		# model.compile(loss=rnn_loss, optimizer='rmsprop', metrics = [rnn_z_loss, rnn_rew_loss, rnn_done_loss])
 
-		return (model,forward)
+		# return (model,forward)
+
+		return modelM
 
 	def set_weights(self, filepath):
 		self.model.load_weights(filepath)
@@ -130,9 +145,9 @@ class RNN():
 
 		z_true = y_true[:,:,:Z_DIM]
 		rew_true = y_true[:,:,-1]
-		# done_true = y_true[:,:,(Z_DIM + 1):]
+		done_true = y_true[:,:,(Z_DIM + 1):]
 
-		return z_true, rew_true #, done_true
+		return z_true, rew_true, done_true
 
 
 	def get_mixture_coef(self, z_pred):

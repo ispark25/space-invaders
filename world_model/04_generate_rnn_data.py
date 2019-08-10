@@ -1,6 +1,6 @@
 #python 03_generate_rnn_data.py
 
-from world_model.vae.arch import VAE, load_vae
+from world_model.vae.arch2 import VAE, load_vae
 import numpy as np
 import argparse
 import os

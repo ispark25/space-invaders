@@ -1,6 +1,6 @@
-#python 02_train_vae.py --new_model
+#python 03_train_vae.py --new_model
 
-from vae.arch import VAE, load_vae
+from vae.arch_final import VAE, load_vae
 import argparse
 import numpy as np
 import os
@@ -8,8 +8,8 @@ from datetime import datetime
 from keras.callbacks import TensorBoard, ModelCheckpoint
 from vae.data_loader import get_generators
 
-INPUT_DIR_NAME = './data/vae_food/'
-WEIGHT_FILE_NAME = './vae/weight/valid_racer_layer4.h5'
+INPUT_DIR_NAME = './data/vae_food_prioritised/'
+WEIGHT_FILE_NAME = './vae/weight/arch_final.h5'
 TV_RATIO = 0.2 # training and validation set split ratio
 
 
@@ -43,8 +43,8 @@ def main(args):
   print(f'Started at: {exec_time} | Finished at: {finish_time}')
 
   # 500 epochs, 100 steps
-
   # use 80 epochs, 500 steps or 100 epochs, 500 steps
+  # for commander: used 50 epochs and 100 steps with arch3 weights as base
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description=('Train VAE'))

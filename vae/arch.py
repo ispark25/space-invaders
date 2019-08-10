@@ -6,6 +6,27 @@ from keras import backend as K
 
 INPUT_DIM = (64,64,3)
 
+# TODO for report:
+# - compare different initialisations, adam, nadam, rmsprop
+# - mention about selu, elu, glorot uniform/normal, softplus, latent_dim, etc.
+
+# C_FILTER    = [32,64,64,128]
+# C_KERN_SIZE = [3,3,3,3] # intuition, different parts of the game aren't really related to each other (localised)
+# C_STRIDE    = [2,2,2,2]
+# C_ACTIV     = ['relu','relu','relu','relu']
+# C_INIT      = ['he_uniform','he_uniform','he_uniform','he_uniform']
+# C_PADDING   = ['same', 'same', 'same', 'same'] # intuition: important for commandership as it lies on the edge
+
+# DENSE_SIZE = 1024
+
+# D_FILTER    = [64,64,32,3]
+# D_KERN_SIZE = [3,3,3,3]
+# D_STRIDE    = [2,2,2,2]
+# D_ACTIV     = ['relu','relu','relu','sigmoid']
+# D_INIT      = ['he_uniform','he_uniform','he_uniform','he_uniform']
+# D_PADDING   = ['same', 'same', 'same', 'same']
+
+
 CONV_FILTERS = [32,64,64,128]
 CONV_KERNEL_SIZES = [4,4,4,4]
 CONV_STRIDES = [2,2,2,2]
@@ -21,8 +42,7 @@ CONV_T_ACTIVATIONS = ['relu','relu','relu','sigmoid']
 CONV_T_INITS = ['he_uniform','he_uniform','he_uniform','he_uniform'] 
 
 Z_DIM = 64
-
-KL_TOLERANCE = 0.5 * 64 * 64  # TODO reduce this value!
+KL_TOLERANCE = 16 # TODO reduce this value!
 
 def sampling(args):
     z_mean, z_sigma = args
@@ -42,7 +62,6 @@ class VAE():
 
         self.input_dim = INPUT_DIM
         self.z_dim = Z_DIM
-        # self.learning_rate = LEARNING_RATE
         self.kl_tolerance = KL_TOLERANCE
 
     def _build(self):

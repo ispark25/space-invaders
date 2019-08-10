@@ -43,7 +43,6 @@ def main(args):
             action = episode_data['action'], 
             reward = episode_data['reward'], 
             done = episode_data['done'].astype(int)) # TODO: why?
-                                                     # processing each observation into vae encoded z, and saving it for training the RNN
 
         # Log progress
         nb_encoded += 1

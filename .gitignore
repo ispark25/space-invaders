@@ -1,4 +1,4 @@
-data/
+world_model/data/
 .vscode
 **/.ipynb_checkpoints
 **/__pycache__

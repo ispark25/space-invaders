@@ -37,10 +37,10 @@ def random_batch(filelist, batch_size):
     N_data = len(filelist)
     indices = np.random.permutation(N_data)[0:batch_size]
 
-    z_list = []
-    action_list = []
-    rew_list = []
-    done_list = []
+    z_list = np.array([])
+    action_list = np.array([])
+    rew_list = np.array([])
+    done_list = np.array([])
 
     for i in indices:
         try:
@@ -52,8 +52,11 @@ def random_batch(filelist, batch_size):
             reward = new_data['reward']
             done = new_data['done']
 
+            action = np.expand_dims(action, axis=2)
             reward = np.expand_dims(reward, axis=2)
             done = np.expand_dims(done, axis=2)
+
+            print("mu:{}, lv:{}, action:{}, reward:{}, done:{}.".format(np.shape(mu),np.shape(log_var),np.shape(action),np.shape(reward),np.shape(done)))
 
             s = log_var.shape
 
@@ -63,14 +66,18 @@ def random_batch(filelist, batch_size):
             action_list.append(action)
             rew_list.append(reward)
             done_list.append(done)
+
         except:
             print("an error occured for {}".format(i))
             pass
 
-    z_list = np.array(z_list)
-    action_list = np.array(action_list)
-    rew_list = np.array(rew_list)
-    done_list = np.array(done_list)
+    # z_list = np.array(z_list)
+    # action_list = np.array(action_list)
+    # rew_list = np.array(rew_list)
+    # done_list = np.array(done_list)
+
+    print("z:{}, action:{}, reward:{}, done:{}.".format(np.shape(z_list),np.shape(action_list),np.shape(rew_list),np.shape(done_list)))
+
 
     return z_list, action_list, rew_list, done_list
 

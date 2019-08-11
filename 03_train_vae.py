@@ -8,8 +8,8 @@ from datetime import datetime
 from keras.callbacks import TensorBoard, ModelCheckpoint
 from vae.data_loader import get_generators
 
-INPUT_DIR_NAME = './data/vae_food_prioritised/'
-FNAME = 'arch_surprise_v4.h5'
+INPUT_DIR_NAME = './data/vae_food_prioritised2/'
+FNAME = 'arch_surprise_purple.h5'
 WEIGHT_FILE_NAME = f'./vae/weight/{FNAME}'
 TV_RATIO = 0.2 # training and validation set split ratio
 
@@ -33,7 +33,7 @@ def main(args):
   vae.train(t_gen, v_gen, 
     epochs=epochs, 
     steps_per_epoch=steps,
-    validation_steps=int(steps * TV_RATIO),
+    validation_steps=int(steps * TV_RATIO), #TODO remove!
     workers=10,
     callbacks=[tensorboard, checkpoint])
   

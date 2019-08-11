@@ -1,11 +1,13 @@
 import numpy as np
+from skimage.measure import block_reduce
+from skimage.transform import resize
 import random
 import gym
 
 import argparse
 
 ENV_NAME = 'SpaceInvaders-v0'
-DIR_NAME = './data/rollout/'
+DIR_NAME = './data/vae_food_3/'
 # MIN_LENGTH = 400 # agent should survive for at least this many frames
 
 DEATH_OFFSET = 40 #32-45
@@ -19,18 +21,15 @@ def main(args):
     env = gym.make(ENV_NAME) # <1>
     print("Generating data for env {}".format(ENV_NAME))
 
-    for s in range(nb_episodes):
-
-        episode_id = random.randint(0, 2**31 - 1) # To minimise conflicts even when running multiple times
-        filename = f'{DIR_NAME}{episode_id}.npz'
-
+    s = 0
+    while s < nb_episodes:
         obs_seq    = []
         action_seq = []
         reward_seq = []
         done_seq   = []
 
         observation = env.reset()
-        reward = 0 # TODO: base reward per frame: e.g. -0.1? possibly bad
+        reward = 0
         done = False
 
         # Player starts off with 3 lives
@@ -38,18 +37,18 @@ def main(args):
 
         repeat = np.random.randint(1, 11)
         t = 0
-        while t < time_steps and not done:
+        while t < time_steps:
             if t % repeat == 0:
                 action = generate_data_action(t, env)  # <2>
                 repeat = np.random.randint(1, 11)
-
-            # observation = cfg.adjust_obs(observation)  # <3>
-            # reward      = cfg.adjust_reward(reward)
 
             obs_seq.append(observation)
             action_seq.append(action)
             reward_seq.append(reward)
             done_seq.append(done)
+
+            if done:
+                break
 
             # Next
             observation, reward, done, info = env.step(action)  # <4>
@@ -64,13 +63,26 @@ def main(args):
                 env.render()
             t = t + 1
 
-        print("Episode {} finished after {} timesteps".format(s, t))
+        # Save episode data if it featured commandership
+        if t < 600: # commanders do not appear earlier than 600 steps
+            print("DISCARDED: Episode {} finished after {} timesteps".format(s, t))
+            continue
 
-        # Save episode data
-        np.savez_compressed(filename, obs=obs_seq, action=action_seq, reward=reward_seq, done=done_seq) # <4>
+        obs_seq = np.array(obs_seq)
+        downsampled = batch_downsample(obs_seq)
 
+        if downsampled is None:
+            print("DISCARDED: Episode {} finished after {} timesteps".format(s, t))
+            continue
+
+        # Randomise filename to minimise conflicts even when running multiple times and across multiple machines
+        episode_id = random.randint(0, 2**31 - 1) 
+        filename = f'{DIR_NAME}{episode_id}.npz'
+        np.savez_compressed(filename, obs=downsampled, action=action_seq, reward=reward_seq, done=done_seq) # <4>
+        
+        print("SAVED: Episode {} finished after {} timesteps".format(s, t))
+        s = s + 1
     env.close()
-
 
 # 0: do nothing
 # 1: shoot
@@ -82,13 +94,36 @@ actions = np.array([0, 1, 2, 3, 4, 5])
 def generate_data_action(t, env):
     return np.random.choice(actions, p=[0.1, 0.18, 0.18, 0.18, 0.18, 0.18])
 
-# def adjust_obs(obs):
-#     # apply cropping etc.
-#     # return obs.astype('float32') / 255.0
-#     return obs
+def batch_downsample(batch):
+    batch_size = len(batch)
+    crop = batch[:, 9:-9, 16:-16]
+    blocky = block_reduce(crop, (1,3,2,1), np.max)
+    
+    # Select top five rows of each frame
+    partial = blocky[:, :5, :, :]
+    
+    # Count the number of non-zero red (in RGB) elements in top section of each frame
+    nonzero = np.count_nonzero(partial[:, :, :, 0], axis=(1,2))
+    scoreboard = nonzero > 48
+    commander  = (~scoreboard) & (nonzero > 0)
 
-# def adjust_reward(reward):
-#     return reward / 10.0
+    # if commander does not exist, do not process further
+    if np.count_nonzero(commander) == 0:
+        return None
+    
+    # smoother resizing method
+    blurry = resize(crop, (batch_size, 64, 64, 3), mode='constant')
+    
+    # remove scoreboard
+    blurry[scoreboard, :5] = 0
+    
+    # whiten bullets
+    blurry[blocky[:,:,:,0] == 142] = 1.0
+    
+    # whiten commandership
+    blurry[commander, :5] = np.where(blocky[commander, :5] > 0, 1.0, 0.0)
+    
+    return blurry
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=('Create new training data'))

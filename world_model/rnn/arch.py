@@ -4,7 +4,7 @@ import numpy as np
 from keras.layers import Input, LSTM, Dense, TimeDistributed
 from keras.models import Model
 from keras import backend as K
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from keras import losses
 from keras.optimizers import Adam
@@ -12,6 +12,11 @@ from keras.optimizers import Adam
 import tensorflow as tf
 
 import mdn
+# for tensorboard
+from datetime import datetime
+from keras.callbacks import TensorBoard
+import json
+
 
 Z_DIM = 64 # 32
 ACTION_DIM = 6 # 3
@@ -26,6 +31,8 @@ REWARD_FACTOR = 1
 LEARNING_RATE = 0.001
 # MIN_LEARNING_RATE = 0.001
 # DECAY_RATE = 1.0
+LOGDIR = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+HIST = "logs/history/"
 
 
 class RNN():
@@ -43,6 +50,9 @@ class RNN():
 
 		self.models = self._build()
 		self.model = self.models
+		self.tensorboard = TensorBoard(log_dir=LOGDIR)
+		self.history = []
+
 		# self.forward = self.models[1]
 
 
@@ -130,12 +140,26 @@ class RNN():
 	def set_weights(self, filepath):
 		self.model.load_weights(filepath)
 
-	def train(self, rnn_input, rnn_output):
+	def train(self, rnn_input, rnn_output,vrnn_input, vrnn_output, step):
 
-		self.model.fit(rnn_input, rnn_output,
+		checkpoint = ModelCheckpoint(LOGDIR+'/step_{}.h5'.format(step), save_weights_only=True, verbose=1, save_best_only=True, mode='min')
+		early_stopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
+
+		hist = self.model.fit(rnn_input, rnn_output,
 			shuffle=False,
 			epochs=1,
-			batch_size=len(rnn_input)) 
+			batch_size=len(rnn_input),
+			callbacks=[self.tensorboard, checkpoint, early_stopping], 
+			validation_data=(vrnn_input, vrnn_output)) 
+
+		# print(hist.history.keys())
+		print(hist.history)
+		self.history.append(hist.history)
+
+
+	def save_history(self, filepath):
+		with open(filepath, "w") as outfile:
+			json.dump(self.history, outfile)
 
 
 	def save_weights(self, filepath):

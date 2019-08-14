@@ -41,8 +41,8 @@ class RNN():
 
 		self.z_dim = Z_DIM
 		self.action_dim = ACTION_DIM
-		self.latent_dims = Z_DIM + ACTION_DIM + 1 # z(64), action(6), reward(1)
-		self.output_dims = Z_DIM + ACTION_DIM + 1 + 1 # z(64), action(6), reward(1), done(1)
+		self.latent_dims = Z_DIM + ACTION_DIM + 1 # z(64), action(2), reward(1)
+		self.output_dims = Z_DIM + ACTION_DIM + 1 + 1 # z(64), action(2), reward(1), done(1)
 		self.hidden_units = HIDDEN_UNITS
 		self.gaussian_mixtures = GAUSSIAN_MIXTURES
 		#self.restart_factor = RESTART_FACTOR
@@ -51,7 +51,7 @@ class RNN():
 
 		self.models = self._build()
 		self.model = self.models[0]
-		# self.decoder = self.models[1]
+		self.decoder = self.models[1]
 		self.tensorboard = TensorBoard(log_dir=LOGDIR)
 		self.history = []
 
@@ -148,17 +148,17 @@ class RNN():
 
 		return (model, forward)
 
-	# def build_decoder(self, rnn_weights='world_model/rnn/weights.h5'):
-	# 	self.decoder.compile(loss = mdn.get_mixture_loss_func(self.output_dims, GAUSSIAN_MIXTURES), optimizer='adam')
-	# 	self.decoder.summary()
-	# 	self.decoder.load_weights(rnn_weights)
+	def build_decoder(self, rnn_weights='world_model/rnn/weights.h5'):
+		self.decoder.compile(loss = mdn.get_mixture_loss_func(self.output_dims, GAUSSIAN_MIXTURES), optimizer='adam')
+		self.decoder.summary()
+		self.decoder.load_weights(rnn_weights)
 
-	# def sample_decoder(self, input, temp, sigma_temp):
-	# 	params = self.decoder.predict(input)
-	# 	return mdn.sample_from_output(params[0], self.output_dims, self.gaussian_mixtures, temp=temp, sigma_temp=sigma_temp)
+	def sample_decoder(self, y_pred, temp, sigma_temp):
+		# params = self.decoder.predict(rnn_input) # [input, hidden_states, cell_states]
+		return mdn.sample_from_output(y_pred, self.output_dims, self.gaussian_mixtures, temp=temp, sigma_temp=sigma_temp)
 
-	# def reset_decoder_states(self):
-	# 	self.decoder.reset_states()
+	def reset_decoder_states(self):
+		self.decoder.reset_states()
 
 	def set_weights(self, filepath):
 		self.model.load_weights(filepath)

@@ -1,6 +1,6 @@
 #python 03_generate_rnn_data.py
 
-from world_model.vae.arch2 import VAE, load_vae
+from world_model.vae.arch_surprise import VAE, load_vae
 import numpy as np
 import argparse
 import os
@@ -30,19 +30,22 @@ def main(args):
     init_lvs = []
 
     for filename in files:
-        episode_data = np.load(INPUT_DIR_NAME + filename)
+        if nb_encoded < 5300:
+            pass
+        else:
+            episode_data = np.load(INPUT_DIR_NAME + filename)
 
-        mu, lv = vae.encoder_mu_log_var.predict(episode_data['obs'])
+            mu, lv = vae.encoder_mu_log_var.predict(episode_data['obs'])
 
-        init_mus.append(mu[0, :]) # mu[i, :] = mu vector for i-th episode
-        init_lvs.append(lv[0, :]) # lv[i, :] = log_var vector for i-th episode
+            init_mus.append(mu[0, :]) # mu[i, :] = mu vector for i-th episode
+            init_lvs.append(lv[0, :]) # lv[i, :] = log_var vector for i-th episode
 
-        np.savez_compressed(OUTPUT_DIR_NAME + filename, 
-            mu=mu, 
-            lv=lv, 
-            action = episode_data['action'], 
-            reward = episode_data['reward'], 
-            done = episode_data['done'].astype(int)) # TODO: why?
+            np.savez_compressed(OUTPUT_DIR_NAME + filename,
+                mu=mu,
+                lv=lv,
+                action = episode_data['action'],
+                reward = episode_data['reward'],
+                done = episode_data['done'].astype(int)) # TODO: why?
 
         # Log progress
         nb_encoded += 1
@@ -58,7 +61,7 @@ def main(args):
 
     np.savez_compressed(ROOT_DIR_NAME + 'initial_z.npz', init_mus=init_mus, init_lvs=init_lvs) # TODO: what for?
 
-    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=('Train VAE'))
     parser.add_argument('--root_dir_name', default = './world_model/data/', help='root Directory.')

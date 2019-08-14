@@ -58,8 +58,12 @@ class DataGenerator(Sequence):
             np.random.shuffle(self.indices)
 
     def _load_data(self, idx):
-        filename = self.filenames[idx]
-        return np.load(self.root + filename)['obs']
+        try:
+            filename = self.filenames[idx]
+            return np.load(self.root + filename)['obs']
+        except:
+            print(f'ERROR loading {filename}')
+            raise
 
     def __data_generation(self, subindices):
         'Generates data containing batch_size samples'

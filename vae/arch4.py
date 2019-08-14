@@ -6,7 +6,7 @@ from keras import backend as K
 
 INPUT_DIM = (64,64,3)
 
-# TODO for report:
+# THIS IS IT!
 
 CONV_FILTERS = [32,64,128,256]
 CONV_KERNEL_SIZES = [4,4,4,4]

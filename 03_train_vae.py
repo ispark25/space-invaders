@@ -1,6 +1,6 @@
 #python 03_train_vae.py --new_model
 
-from vae.arch_surprise import VAE, load_vae
+from vae.arch_surprise_final import VAE, load_vae
 import argparse
 import numpy as np
 import os
@@ -8,10 +8,10 @@ from datetime import datetime
 from keras.callbacks import TensorBoard, ModelCheckpoint
 from vae.data_loader import get_generators
 
-INPUT_DIR_NAME = './data/vae_food_prioritised2/'
-FNAME = 'arch_surprise_purple.h5'
+INPUT_DIR_NAME = './data/vae_food_3/'
+FNAME = 'arch_surprise_final.h5'
 WEIGHT_FILE_NAME = f'./vae/weight/{FNAME}'
-TV_RATIO = 0.2 # training and validation set split ratio
+TV_RATIO = 0.1 # training and validation set split ratio
 
 
 def main(args):
@@ -34,8 +34,10 @@ def main(args):
     epochs=epochs, 
     steps_per_epoch=steps,
     validation_steps=int(steps * TV_RATIO), #TODO remove!
+    # validation_steps=steps,
     workers=10,
-    callbacks=[tensorboard, checkpoint])
+    callbacks=[tensorboard, checkpoint]
+    )
   
   # save model weights
   vae.save_weights(WEIGHT_FILE_NAME)

@@ -22,12 +22,13 @@ import json
 Z_DIM = 64 # 32
 ACTION_DIM = 2 # 3
 
-HIDDEN_UNITS = 256
+HIDDEN_UNITS = 512 # 256
 GAUSSIAN_MIXTURES = 5
 
 Z_FACTOR = 1
 REWARD_FACTOR = 1
-#RESTART_FACTOR = 0
+# RESTART_FACTOR = 0
+DONE_FACTOR  = 10
 
 LEARNING_RATE = 0.001
 # MIN_LEARNING_RATE = 0.001
@@ -37,7 +38,7 @@ HIST = "logs/history/"
 
 
 class RNN():
-	def __init__(self): #, learning_rate = 0.001
+	def __init__(self): #, HIDDEN_UNITS, GAUSSIAN_MIXTURES, grad_clip, restart_factor, learning_rate, decay_rate, min_learning_rate): #, learning_rate = 0.001
 
 		self.z_dim = Z_DIM
 		self.action_dim = ACTION_DIM
@@ -62,21 +63,21 @@ class RNN():
 
 		# #### THE MODEL THAT WILL BE TRAINED
 
-		# rnn_x = Input(shape=(None, Z_DIM + ACTION_DIM + 1))
+		# inputs = Input(shape=(None, Z_DIM + ACTION_DIM + 1))
 		inputs = Input(shape=(None, self.latent_dims), name = 'inputs')
 
 		# lstm = LSTM(HIDDEN_UNITS, return_sequences=True, return_state = True)
-		lstm = LSTM(self.hidden_units, name = 'lstm', return_sequences = True, return_state = True)
+		lstm = LSTM(self.hidden_units, name = 'lstm', return_sequences = True, return_state = True, dropout = 0.90)
 
-		# lstm_output_model, _ , _ = lstm(rnn_x)
+		# lstm_output_model, _ , _ = lstm(inputs)
 		lstm_output_model, _, _ = lstm(inputs)
 
-		# mdn = Dense(GAUSSIAN_MIXTURES * (3*Z_DIM) + 1)
-		# mdn_model = mdn(lstm_output_model)
+		# mdn_layer = Dense(GAUSSIAN_MIXTURES * (3*Z_DIM) + 1)
+		# mdn_out = mdn_layer(lstm_output_model)
 		mdn_layer = mdn.MDN(self.output_dims, GAUSSIAN_MIXTURES, name='mdn_outputs')
 		mdn_out = mdn_layer(lstm_output_model)
 
-		# model = Model(rnn_x, mdn_model)
+		# model = Model(inputs, mdn_model)
 		model = Model(inputs = inputs, outputs = mdn_out)
 
 		# #### THE MODEL USED DURING PREDICTION
@@ -84,53 +85,116 @@ class RNN():
 		# state_input_c = Input(shape=(HIDDEN_UNITS,))
 		state_input_h = Input(shape=(self.hidden_units,))
 		state_input_c = Input(shape=(self.hidden_units,))
-		# lstm_output_forward , state_h, state_c = lstm(rnn_x, initial_state = [state_input_h, state_input_c])
+		# lstm_output_forward , state_h, state_c = lstm(inputs, initial_state = [state_input_h, state_input_c])
 		lstm_output_forward, state_h, state_c = lstm(inputs, initial_state = [state_input_h, state_input_c])
 		# mdn_forward = mdn(lstm_output_forward)
 		mdn_forward = mdn_layer(lstm_output_forward)
 
-		# forward = Model([rnn_x] + [state_input_h, state_input_c], [mdn_forward, state_h, state_c])
+		# forward = Model([inputs] + [state_input_h, state_input_c], [mdn_forward, state_h, state_c])
 		forward = Model([inputs] + [state_input_h, state_input_c], [mdn_forward, state_h, state_c])
 		#### LOSS FUNCTION
 
 		# def rnn_z_loss(y_true, y_pred):
-
-		# 	z_true, rew_true = self.get_responses(y_true)
-
+		#
+		# 	z_true, _, _ = self.get_responses(y_true)
+		#
 		# 	d = GAUSSIAN_MIXTURES * Z_DIM
 		# 	z_pred = y_pred[:,:,:(3*d)]
 		# 	z_pred = K.reshape(z_pred, [-1, GAUSSIAN_MIXTURES * 3])
-
+		#
 		# 	log_pi, mu, log_sigma = self.get_mixture_coef(z_pred)
-
+		#
 		# 	flat_z_true = K.reshape(z_true,[-1, 1])
-
+		#
 		# 	z_loss = log_pi + self.tf_lognormal(flat_z_true, mu, log_sigma)
 		# 	z_loss = -K.log(K.sum(K.exp(z_loss), 1, keepdims=True))
-
+		#
 		# 	z_loss = K.mean(z_loss)
-
+		#
 		# 	return z_loss
-
+		#
+		# def rnn_action_loss(y_true, y_pred):
+		#
+		# 	_, action_true, _ = self.get_responses(y_true)
+		#
+		# 	d = GAUSSIAN_MIXTURES * Z_DIM
+		# 	z_pred = y_pred[:,:,:(3*d)]
+		# 	z_pred = K.reshape(z_pred, [-1, GAUSSIAN_MIXTURES * 3])
+		#
+		# 	log_pi, mu, log_sigma = self.get_mixture_coef(z_pred)
+		#
+		# 	flat_z_true = K.reshape(z_true,[-1, 1])
+		#
+		# 	z_loss = log_pi + self.tf_lognormal(flat_z_true, mu, log_sigma)
+		# 	z_loss = -K.log(K.sum(K.exp(z_loss), 1, keepdims=True))
+		#
+		# 	z_loss = K.mean(z_loss)
+		#
+		# 	return z_loss
+		#
 		# def rnn_rew_loss(y_true, y_pred):
-
-		# 	z_true, rew_true = self.get_responses(y_true) #, done_true
-
+		#
+		# 	_, _, rew_true = self.get_responses(y_true) #, done_true
+		#
 		# 	d = GAUSSIAN_MIXTURES * Z_DIM
 		# 	reward_pred = y_pred[:,:,-1]
-
+		#
 		# 	rew_loss =  K.binary_crossentropy(rew_true, reward_pred, from_logits = True)
-
+		#
 		# 	rew_loss = K.mean(rew_loss)
-
+		#
 		# 	return rew_loss
-
+		#
+		# def rnn_done_loss(y_true, y_pred):
+		#
+		# 	_, _, _, done_true = self.get_responses(y_true) #, done_true
+		#
+		# 	d = GAUSSIAN_MIXTURES * Z_DIM
+		# 	reward_pred = y_pred[:,:,-1]
+		#
+		# 	rew_loss =  K.binary_crossentropy(rew_true, reward_pred, from_logits = True)
+		#
+		# 	rew_loss = K.mean(rew_loss)
+		#
+		# 	return rew_loss
+		#
 		# def rnn_loss(y_true, y_pred):
-
+		#
 		# 	z_loss = rnn_z_loss(y_true, y_pred)
+		# 	action_loss = rnn_action_loss(y_true, y_pred)
 		# 	rew_loss = rnn_rew_loss(y_true, y_pred)
+		# 	done_loss = rnn_done_loss(y_true, y_pred)
+		#
+		# 	return Z_FACTOR * z_loss + ACTION_FACTOR * action_loss + REWARD_FACTOR * rew_loss + DONE_FACTOR * done_loss
 
-		# 	return Z_FACTOR * z_loss + REWARD_FACTOR * rew_loss
+		# def get_mixture_loss_func(output_dim, num_mixes, z_factor, action_factor, reward_factom done_factor):
+		#     """Construct a loss functions for the MDN layer parametrised by number of mixtures."""
+		#     # Construct a loss function with the right number of mixtures and outputs
+		#     def loss_func(y_true, y_pred):
+		#         # Reshape inputs in case this is used in a TimeDistribued layer
+		#         y_pred = tf.reshape(y_pred, [-1, (2 * num_mixes * output_dim) + num_mixes], name='reshape_ypreds')
+		#         y_true = tf.reshape(y_true, [-1, output_dim], name='reshape_ytrue')
+		#         # Split the inputs into paramaters
+		#         out_mu, out_sigma, out_pi = tf.split(y_pred, num_or_size_splits=[num_mixes * output_dim,
+		#                                                                          num_mixes * output_dim,
+		#                                                                          num_mixes],
+		#                                              axis=-1, name='mdn_coef_split')
+		#         # Construct the mixture models
+		#         cat = tfd.Categorical(logits=out_pi)
+		#         component_splits = [output_dim] * num_mixes
+		#         mus = tf.split(out_mu, num_or_size_splits=component_splits, axis=1)
+		#         sigs = tf.split(out_sigma, num_or_size_splits=component_splits, axis=1)
+		#         coll = [tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale) for loc, scale
+		#                 in zip(mus, sigs)]
+		#         mixture = tfd.Mixture(cat=cat, components=coll)
+		#         loss = mixture.log_prob(y_true)
+		#         loss = tf.negative(loss)
+		#         loss = tf.reduce_mean(loss)
+		#         return loss
+		#
+		#     # Actually return the loss_func
+		#     with tf.name_scope('MDN'):
+		#         return loss_func
 
 		# opti = Adam(lr=LEARNING_RATE)
 		# model.compile(loss=rnn_loss, optimizer=opti, metrics = [rnn_z_loss, rnn_rew_loss]) #, rnn_done_loss
@@ -165,14 +229,14 @@ class RNN():
 
 	def train(self, rnn_input, rnn_output,vrnn_input, vrnn_output, step):
 
-		checkpoint = ModelCheckpoint(LOGDIR+'/step_{}.h5'.format(step), save_weights_only=True, verbose=1, save_best_only=True, mode='min')
-		early_stopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
+		# checkpoint = ModelCheckpoint(LOGDIR+'/step_{}.h5'.format(step), save_weights_only=True, verbose=1, save_best_only=True, mode='min')
+		# early_stopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
 
 		hist = self.model.fit(rnn_input, rnn_output,
 		shuffle=False,
 		epochs=1,
 		batch_size=len(rnn_input),
-		callbacks=[self.tensorboard, checkpoint, early_stopping],
+		callbacks=[self.tensorboard], #, checkpoint, early_stopping],
 		validation_data=(vrnn_input, vrnn_output))
 
 		# print(hist.history.keys())
@@ -190,11 +254,23 @@ class RNN():
 
 	def get_responses(self, y_true):
 
-		z_true = y_true[:,:,:Z_DIM]
-		rew_true = y_true[:,:,-1]
-		done_true = y_true[:,:,(Z_DIM + 1):]
+		z_true = y_true[:,:,:self.z_dim]
+		action_true = y_true[:,:,self.z_dim:self.z_dim+self.action_dim]
+		rew_true = y_true[:,:,-2]
+		done_true = y_true[:,:,-1]
+		# done_true = y_true[:,:,(Z_DIM + 1):]
 
-		return z_true, rew_true, done_true
+		return z_true, action_true, rew_true, done_true
+
+	def get_predictions(self, y_pred):
+
+		z_pred = y_pred[:,:,:self.z_dim]
+		action_pred = y_true[:,:,self.z_dim:self.z_dim+self.action_dim]
+		rew_pred = y_true[:,:,-2]
+		done_pred = y_true[:,:,-1]
+		# done_true = y_true[:,:,(Z_DIM + 1):]
+
+		return z_pred, action_pred, rew_pred, done_pred
 
 
 	def get_mixture_coef(self, z_pred):

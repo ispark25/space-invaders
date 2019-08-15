@@ -5,7 +5,7 @@ import random
 import gym
 
 from world_model.vae.arch_surprise_lower_tolerance import VAE, load_vae
-from world_model.rnn.arch_v2 import RNN
+from world_model.rnn.arch_v3 import RNN
 
 import argparse
 
@@ -25,8 +25,8 @@ def main(args):
 	print("Generating data for env {}".format(ENV_NAME))
 	s = 0
 
-	rnn = RNN()
-	rnn.decoder.load_weights("world_model/rnn/weights/weights_arch2_b1_s630.h5")
+	rnn = RNN(args)
+	rnn.decoder.load_weights("world_model/rnn/weights/weights_arch_3_b1_s3600_h512.h5")
 
 	vae = load_vae("world_model/vae/weights/arch_surprise_medium_tolerance.h5")
 
@@ -64,6 +64,7 @@ def main(args):
 		# for rollout test
 		h = rnn
 		while t < time_steps:
+			print("t={}".format(t))
 
 			if t % repeat == 0:
 				action = generate_data_action(t, env)  # <2>
@@ -108,29 +109,29 @@ def main(args):
 				else: #x%2 == 0
 					return 1
 			cont_action = [convert_x(int(action)),convert_y(int(action))]
-			print("shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z),np.shape([cont_action]),np.shape(reward),np.shape([done])))
-			# z = np.expand_dims(z, axis = 0)
-			# action = np.expand_dims(action, axis = 0)
-			# action = np.expand_dims(action, axis = 0)
-			# reward = [[[reward]]]
-			# done = [[[int(done)]]]
-			# done = np.expand_dims(np.array(done), axis=0)
-			print("After expanding, shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z[0]),np.shape(cont_action),np.shape(reward),np.shape(done)))
+			# print("shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z),np.shape([cont_action]),np.shape(reward),np.shape([done])))
+			# print("After expanding, shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z[0]),np.shape(cont_action),np.shape(reward),np.shape(done)))
 			# action = np.array(list(list(a) for a in zip([convert_x(int(a)) for a in [action]], [convert_y(int(a)) for a in [action]])))
 			input_to_rnn = [np.array([[np.concatenate([z[0], cont_action, [reward]])]]), np.array([hidden]), np.array([cell])]
-
 
 			out = rnn.decoder.predict(input_to_rnn)
 			# print(out)
 			y_pred = out[0][0][0]
 			next_z = rnn.sample_decoder(y_pred, 1, 1)
+			# print("shape: {}".format(np.shape(next_z)))
+			next_z = next_z[0]
+			done_pred = next_z[-1]
+			reward_pred = next_z[-2]
+			action_pred = next_z[-4:-2]
+			print("predictions: done: {}, reward: {}, action: {}".format(done_pred, reward_pred, action_pred))
+			print("true:        done: {}, reward: {}, action: {}".format(done, reward, cont_action))
 			hidden = out[1][0]
 			cell = out[2][0]
 
-			print("next_z: {}".format(np.shape(next_z)))
-			loss = (np.square(z[0] - next_z[0, :-(4)])).mean(axis=None)
-			print(loss)
-			print("y_pred: {}, hidden:{}, cell:{}".format(np.shape(y_pred), np.shape(hidden), np.shape(cell)))
+			# print("next_z: {}".format(np.shape(next_z)))
+			# loss = (np.square(z[0] - next_z[0, :-(4)])).mean(axis=None)
+			# print(loss)
+			# print("y_pred: {}, hidden:{}, cell:{}".format(np.shape(y_pred), np.shape(hidden), np.shape(cell)))
 
 			if render:
 				env.render()
@@ -230,6 +231,25 @@ if __name__ == '__main__':
 						help='how many timesteps at start of episode?')
 	parser.add_argument('--render', default=0, type=int,
 						help='render the env as data is generated')
+	# extra hyperparameters
+	parser.add_argument('--z_factor', default = 1)
+	parser.add_argument('--action_factor', default = 1)
+	parser.add_argument('--reward_factor', default = 1)
+	parser.add_argument('--done_factor', default = 10)
+	parser.add_argument('--hidden_units', default = 256)
+	parser.add_argument('--grad_clip', default = 1.0)
+	parser.add_argument('--num_mixture', default = 5)
+	parser.add_argument('--restart_factor', default = 10)
+	parser.add_argument('--learning_rate', default = 0.001)
+	parser.add_argument('--decay_rate', default = 0.99999)
+	parser.add_argument('--min_learning_rate', default = 0.00001)
+	parser.add_argument('--use_layer_norm', default = 0)
+	parser.add_argument('--use_recurrent_dropout', default = 0)
+	parser.add_argument('--recurrent_dropout_prob', default = 0.90)
+	parser.add_argument('--use_input_dropout', default = 0)
+	parser.add_argument('--input_dropout_prob', default=0.90)
+	parser.add_argument('--use_output_dropout', default = 0)
+	parser.add_argument('--output_dropout_prob', default = 0.90)
 
 	args = parser.parse_args()
 	main(args)

@@ -1,7 +1,7 @@
 #python 04_train_rnn.py --new_model --batch_size 200
 # python 04_train_rnn.py --new_model --batch_size 100
 
-from world_model.rnn.arch_v2 import RNN
+from world_model.rnn.arch_v3 import RNN
 import argparse
 import numpy as np
 import os
@@ -23,6 +23,7 @@ def get_filelist(N):
 	  filelist = filelist[:N]
 
 	if length_filelist < N:
+
 	  N = length_filelist
 
 	return filelist, N
@@ -107,15 +108,15 @@ def main(args):
 		print('STEP ' + str(step))
 
 		z, action, rew, done = random_batch(filelist, batch_size)
-		# print("shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z),np.shape(action),np.shape(rew),np.shape(done)))
-		# print("rnnin shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z[:, :-1,:]),np.shape(action[:, :-1,:]),np.shape(rew[:, :-1,:]),np.shape(done[:, :-1,:])))
+		print("shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z),np.shape(action),np.shape(rew),np.shape(done)))
+		print("rnnin shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z[:, :-1,:]),np.shape(action[:, :-1,:]),np.shape(rew[:, :-1,:]),np.shape(done[:, :-1,:])))
 		rnn_input = np.concatenate([z[:, :-1, :], action[:, :-1, :], rew[:, :-1, :]], axis = 2)
 		rnn_output = np.concatenate([z[:, 1:, :], action[:, 1:,:], rew[:, 1:, :], done[:, 1:,:]], axis = 2) # ,action[:, 1:], done[:, 1:]
-		# print("Shape of rnnin: {}, rnnout:{}".format(np.shape(rnn_input), np.shape(rnn_output)))
+		print("Shape of rnnin: {}, rnnout:{}".format(np.shape(rnn_input), np.shape(rnn_output)))
 
 		# validation set
 		vz, vaction, vrew , vdone = random_batch(filelist, batch_size, True)
-		# print("shapes are: z={}, action={}, reward={}, done={}".format(np.shape(vz),np.shape(vaction),np.shape(vrew),np.shape(vdone)))
+		print("shapes are: z={}, action={}, reward={}, done={}".format(np.shape(vz),np.shape(vaction),np.shape(vrew),np.shape(vdone)))
 		vrnn_input = np.concatenate([vz[:, :-1, :], vaction[:, :-1, :], vrew[:, :-1, :]], axis = 2)
 		vrnn_output = np.concatenate([vz[:, 1:, :], vaction[:, 1:,:], vrew[:, 1:, :], vdone[:, 1:,:]], axis = 2) # ,action[:, 1:], done[:, 1:]
 
@@ -124,11 +125,12 @@ def main(args):
 
 		rnn.train(rnn_input, rnn_output, vrnn_input, vrnn_output, step)
 
-		if step % 10 == 0:
-			rnn.model.save_weights(args.rnn_weights)
-
 		if step % 100 == 0:
-			rnn.save_history(HIST_DIR_NAME)
+			rnn.model.save_weights(args.rnn_weights + 'step_{}.h5'.format(step))
+			rnn.save_history(args.hist_dir_name)
+
+		# if step % 100 == 0:
+		# 	rnn.save_history(HIST_DIR_NAME)
 
 	rnn.model.save_weights('./world_model/rnn/weights.h5')
 
@@ -139,7 +141,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description=('Train RNN'))
 	parser.add_argument('--N',default = 10000, help='number of episodes to use to train')
 	parser.add_argument('--new_model', action='store_true', help='start a new model from scratch?')
-	parser.add_argument('--steps', default = 4000, help='how many rnn batches to train over')
+	parser.add_argument('--steps', default = 10000, help='how many rnn batches to train over')
 	parser.add_argument('--batch_size', default = 1, help='how many episodes in a batch? (currently online learning)')
 	parser.add_argument('--seq_length', default = 300, help='how long is a sequence?')
 	parser.add_argument('--root_dir_name', default='./world_model/data/',
@@ -150,7 +152,25 @@ if __name__ == "__main__":
 						help="Directory name for rnn weights")
 	parser.add_argument('--hist_dir_name', default='./world_model/rnn/history/hist-{}.json'.format(datetime.now().strftime("%Y%m%d-%H%M%S")),
 						help="")
-
+	# extra hyperparameters
+	parser.add_argument('--z_factor', default = 1)
+	parser.add_argument('--action_factor', default = 1)
+	parser.add_argument('--reward_factor', default = 1)
+	parser.add_argument('--done_factor', default = 10)
+	parser.add_argument('--hidden_units', default = 256)
+	parser.add_argument('--grad_clip', default = 1.0)
+	parser.add_argument('--num_mixture', default = 5)
+	parser.add_argument('--restart_factor', default = 10)
+	parser.add_argument('--learning_rate', default = 0.001)
+	parser.add_argument('--decay_rate', default = 0.99999)
+	parser.add_argument('--min_learning_rate', default = 0.00001)
+	parser.add_argument('--use_layer_norm', default = 0)
+	parser.add_argument('--use_recurrent_dropout', default = 0)
+	parser.add_argument('--recurrent_dropout_prob', default = 0.90)
+	parser.add_argument('--use_input_dropout', default = 0)
+	parser.add_argument('--input_dropout_prob', default=0.90)
+	parser.add_argument('--use_output_dropout', default = 0)
+	parser.add_argument('--output_dropout_prob', default = 0.90)
 	args = parser.parse_args()
 
 	main(args)

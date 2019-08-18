@@ -54,8 +54,6 @@ class SpaceInvadersRNNEnv(gym.Env):
 		# initialise and load VAE and RNN
 		self.vae = load_vae("world_model/vae/weights/arch_surprise_medium_tolerance.h5")
 		self.rnn = RNN()
-		# self.rnn.decoder.load_weights("world_model/rnn/weights_final_20190816-121335.h5")
-		# self.rnn.decoder.load_weights("world_model/rnn/weights.h5step_7400.h5")
 		self.rnn.decoder.load_weights("world_model/rnn/renders-hist-20190818-042041.json/weights.h5")
 
 		self.action_space = spaces.Box(low=np.array([-1.0, 0.0]), high=np.array([1.0, 1.0]), dtype=np.float32)
@@ -83,17 +81,9 @@ class SpaceInvadersRNNEnv(gym.Env):
 		idx = np.random.randint(0, len(self.initial_mu_logvar))
 		init_mu, init_logvar = self.initial_mu_logvar[idx]
 		print("mu:{}, lv:{}".format(init_mu, init_logvar))
-		# init_mu = np.divide(np.array(init_mu),10000.)
-		# init_logvar = np.divide(np.array(init_logvar),10000.)
 		init_sb = np.shape(init_logvar)
 		init_z = init_mu + np.exp(init_logvar/2.0) * np.random.randn(*init_sb)
-		# init_z = init_mu + np.exp(init_logvar/2.0) * np.random.randn(*init_logvar.shape)
 		return init_z
-
-		# 	preprocessed = downsample(observation)
-		# 	mu, lv = vae.encoder_mu_log_var.predict(np.array([preprocessed]))
-		# 	sb = np.shape(lv)
-		# 	next_z = mu + np.exp(lv/2.0) * np.random.randn(*sb)
 
 	def _current_state(self):
 		return np.concatenate([self.z, self.rnn_hidden.flatten(), self.rnn_cell.flatten()], axis=0)
@@ -122,11 +112,10 @@ class SpaceInvadersRNNEnv(gym.Env):
 		print("After pred, shapes are: nz={} nreward={}".format(np.shape(next_z),np.shape(next_rew)))
 
 		print("predictions: done: {}, reward: {}".format(next_done, next_rew))
-		# if next_done > 0:
-		# 	done = True
-		# else:
-		# 	done = False
-		done = False
+		if next_done > 0:
+			done = True
+		else:
+			done = False
 
 		reward = next_rew - prev_cum_reward
 
@@ -158,8 +147,8 @@ class SpaceInvadersRNNEnv(gym.Env):
 		img = (img*255).astype(np.uint8)
 		img = img.reshape(64, 64, 3)
 		print(img)
-		# if upsize:
-		# 	img = rescale(img, 2.5, anti_aliasing=False)
+		if upsize:
+			img = rescale(img, 2.5, anti_aliasing=False)
 		return img
 
 	def render(self, mode='human', close=False):
@@ -173,10 +162,10 @@ class SpaceInvadersRNNEnv(gym.Env):
 			return
 
 		if mode == 'rbg_array':
-			img = self._get_image(upsize = True)
+			img = self._get_image(upsize = False)
 
 		elif mode == 'human':
-			img = self._get_image(upsize=True)
+			img = self._get_image(upsize = False) #set true to save upsized images to directory
 			from gym.envs.classic_control import rendering
 			if self.viewer is None:
 				self.viewer = rendering.SimpleImageViewer()
@@ -269,156 +258,6 @@ def main(args):
 		print('cumulative reward', total_reward)
 	print('average reward', np.mean(reward_list))
 	env.close()
-
-	# rnn = RNN()
-	# rnn.decoder.load_weights("world_model/rnn/weights_final_20190816-121335.h5")
-	#
-	# vae = load_vae("world_model/vae/weights/arch_surprise_medium_tolerance.h5")
-	#
-	# def rollout(controller):
-	#     obs = env.reset()
-	#     h = rnn.initial_state()
-	#     done = False
-	#     cumulative_reward = 0
-	#     while not done:
-	#         z = vae.encode(obs)
-	#         a = controller.action([z,h])
-	#         obs, reward, done = env.step(a)
-	#         cumulative_reward += reward
-	#         h = rnn.forward([z,a,h])
-	#
-	# env = gym.make(ENV_NAME) # <1>
-	#
-	# s=0
-	# while s < nb_episodes:
-	# 	real = {"obs":[], "z":[], "action":[], "reward":[], "done":[]}
-	# 	dream = {"obs":[], "z":[], "action":[], "reward":[], "done":[]}
-	#
-	# 	# obs_seq    = []
-	# 	# action_seq = []
-	# 	# reward_seq = []
-	# 	# done_seq   = []
-	#
-	# 	observation = env.reset()
-	# 	reward = 0
-	# 	cumulative_reward = 0
-	# 	done = False
-	#
-	# 	dobs = None
-	# 	dreward = 0
-	# 	dcumulative_reward = 0
-	# 	ddone = 0
-	#
-	# 	hidden = np.zeros(rnn.hidden_units)
-	# 	cell = np.zeros(rnn.hidden_units)
-	#
-	# 	# Player starts off with 3 lives
-	# 	prev_lives = 3
-	#
-	# 	repeat = np.random.randint(1, 11)
-	# 	t = 0
-	#
-	# 	#initial rollout
-	# 	action = generate_data_action(t, env)  # <2>
-	# 	repeat = np.random.randint(1, 11)
-	#
-	# 	real["obs"].append(observation)
-	# 	real["action"].append(action)
-	# 	real["reward"].append(reward)
-	# 	real["done"].append(done)
-	#
-	# 	preprocessed = downsample(observation)
-	# 	mu, lv = vae.encoder_mu_log_var.predict(np.array([preprocessed]))
-	# 	np.savez_compressed('./world_model/data/' + 'initial_z.npz', init_mus=mu, init_lvs=lv) # TODO: what for?
-	# 	sb = np.shape(lv)
-	# 	next_z = mu + np.exp(lv/2.0) * np.random.randn(*sb)
-	#
-	# 	print(next_z)
-	# 	print(np.shape(hidden))
-	# 	print(np.shape(cell))
-	# 	t+=1
-	#
-	# 	# for rollout test
-	# 	h = rnn
-	# 	while t < time_steps:
-	# 		print("t={}".format(t))
-	#
-	# 		if t % repeat == 0:
-	# 			action = generate_data_action(t, env)  # <2>
-	# 			repeat = np.random.randint(1, 11)
-	#
-	# 		real["obs"].append(observation)
-	# 		real["action"].append(action)
-	# 		real["reward"].append(reward)
-	# 		real["done"].append(done)
-	#
-	# 		if done:
-	# 			print("REACHED DONE STATE")
-	# 			break
-	#
-	# 		# Next
-	# 		observation, reward, done, info = env.step(action)  # <4>
-	# 		# Extra code to penalise for death
-	# 		curr_lives = info['ale.lives']
-	# 		if curr_lives < prev_lives:
-	# 			reward_seq[max(0, t - DEATH_OFFSET)] += DEATH_PENALTY
-	# 			cumulative_reward += DEATH_PENALTY
-	# 		prev_lives = curr_lives
-	#
-	# 		# preprocessed = downsample(observation)
-	# 		# # print(preprocessed)
-	# 		#
-	# 		# mu, lv = vae.encoder_mu_log_var.predict(np.array([preprocessed]))
-	# 		# sb = np.shape(lv)
-	# 		# next_z = mu + np.exp(lv/2.0) * np.random.randn(*sb)
-	#
-	# 		cumulative_reward += reward
-	# 		def convert_y(y):
-	# 			if y == 0 or y == 2 or y == 3:
-	# 				return 0
-	# 			else:
-	# 				return 1
-	#
-	# 		def convert_x(x):
-	# 			if x <= 1:
-	# 				return 0
-	# 			elif x%2 == 1:
-	# 				return -1
-	# 			else: #x%2 == 0
-	# 				return 1
-	# 		cont_action = [convert_x(int(action)),convert_y(int(action))]
-	# 		# print("After expanding, shapes are: z={}, action={}, reward={}, done={}".format(np.shape(z[0]),np.shape(cont_action),np.shape([reward]),np.shape(done)))
-	# 		input_to_rnn = [np.array([[np.concatenate([next_z[0], cont_action, [cumulative_reward]])]]), np.array([hidden]), np.array([cell])]
-	# 		next_z, next_rew, hidden, cell, next_done = rnn.sample_decoder(input_to_rnn, 1)
-	# 		# print("shape: {}".format(np.shape(next_z)))
-	# 		print("predictions: done: {}, reward: {}".format(next_done, next_rew))
-	# 		print("true:        done: {}, reward: {}".format(done, cumulative_reward))
-	#
-	#
-	# 		if render:
-	# 			env.render()
-	# 		t = t + 1
-	#
-	# 	# Save episode data if it featured commandership
-	# 	if t < 600: # commanders do not appear earlier than 600 steps
-	# 		print("DISCARDED: Episode {} finished after {} timesteps".format(s, t))
-	# 		continue
-	#
-	# 	obs_seq = np.array(obs_seq)
-	# 	downsampled = batch_downsample(obs_seq)
-	#
-	# 	if downsampled is None:
-	# 		print("DISCARDED: Episode {} finished after {} timesteps".format(s, t))
-	# 		continue
-	#
-	# 	# Randomise filename to minimise conflicts even when running multiple times and across multiple machines
-	# 	episode_id = random.randint(0, 2**31 - 1)
-	# 	filename = f'{DIR_NAME}{episode_id}.npz'
-	# 	np.savez_compressed(filename, obs=downsampled, action=action_seq, reward=reward_seq, done=done_seq) # <4>
-	#
-	# 	print("SAVED: Episode {} finished after {} timesteps".format(s, t))
-	# 	s = s + 1
-	# env.close()
 
 # 0: do nothing
 # 1: shoot

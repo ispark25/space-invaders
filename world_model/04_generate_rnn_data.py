@@ -30,26 +30,23 @@ def main(args):
     init_lvs = []
 
     for filename in files:
-        if nb_encoded < 5990:
-            pass
-        else:
-            episode_data = np.load(INPUT_DIR_NAME + filename)
+        episode_data = np.load(INPUT_DIR_NAME + filename)
 
-            mu, lv = vae.encoder_mu_log_var.predict(episode_data['obs'])
+        mu, lv = vae.encoder_mu_log_var.predict(episode_data['obs'])
 
-            print("mu:{}, lv:{}".format(mu[0,:], lv[0,:]))
-            print("mu:{}, lv:{}".format(np.shape(mu[0,:]), np.shape(lv[0,:])))
+        print("mu:{}, lv:{}".format(mu[0,:], lv[0,:]))
+        print("mu:{}, lv:{}".format(np.shape(mu[0,:]), np.shape(lv[0,:])))
 
-            init_mus.append(mu[0, :]) # mu[i, :] = mu vector for i-th episode
-            init_lvs.append(lv[0, :]) # lv[i, :] = log_var vector for i-th episode
+        init_mus.append(mu[0, :]) # mu[i, :] = mu vector for i-th episode
+        init_lvs.append(lv[0, :]) # lv[i, :] = log_var vector for i-th episode
 
-            # np.savez_compressed(OUTPUT_DIR_NAME + filename,
-            #     mu=mu,
-            #     lv=lv,
-            #     action = episode_data['action'],
-            #     reward = episode_data['reward'],
-            #     done = episode_data['done'].astype(int)) # TODO: why?
-            print(".",end="")
+        np.savez_compressed(OUTPUT_DIR_NAME + filename,
+            mu=mu,
+            lv=lv,
+            action = episode_data['action'],
+            reward = episode_data['reward'],
+            done = episode_data['done'].astype(int))
+        print(".",end="")
 
         # Log progress
         nb_encoded += 1

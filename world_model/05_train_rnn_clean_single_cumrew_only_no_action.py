@@ -92,7 +92,7 @@ def main(args):
 	batch_size = int(args.batch_size)
 	seq_length = int(args.seq_length)
 
-	rnn = RNN() #learning_rate = LEARNING_RATE
+	rnn = RNN()
 
 	if not new_model:
 		try:
@@ -130,9 +130,6 @@ def main(args):
 		if step % 100 == 0:
 			rnn.model.save_weights(args.rnn_weights + 'step_{}.h5'.format(step))
 			rnn.save_history(args.hist_dir_name)
-
-		# if step % 100 == 0:
-		# 	rnn.save_history(HIST_DIR_NAME)
 
 	rnn.model.save_weights('./world_model/rnn/weights.h5')
 

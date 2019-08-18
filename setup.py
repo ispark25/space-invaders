@@ -44,7 +44,8 @@ _LIBS = ('python-numpy python-dev cmake zlib1g-dev libjpeg-dev xvfb libav-tools'
          ' xorg-dev python-opengl libboost-all-dev libsdl2-dev swig').split()
 
 CUSTOM_COMMANDS = [
-    ['apt-get', 'update'],
+    ['apt-key','adv', '--keyserver', 'keyserver.ubuntu.com', '--recv-keys', '648ACFD622F3D138'],
+    ['apt-get', '-o', 'Acquire::Check-Valid-Until=false','update'],
     ['apt-get', 'install', '-y'] + _LIBS,
 ]
 
@@ -84,7 +85,7 @@ class CustomCommands(setuptools.Command):
 
 REQUIRED_PACKAGES = [
     'absl_py==0.7.0', 'numpy==1.14.5', 'gym[atari]==0.10.4',
-    'keras', 'opencv_python==3.4.3.18', 'moviepy'
+    'keras', 'h5py', 'opencv_python==3.4.3.18', 'moviepy', 'tensorflow-probability', 'google-cloud-storage==1.17.0'
 ]
 
 setup(

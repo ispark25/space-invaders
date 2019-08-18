@@ -1,7 +1,7 @@
 #python 04_train_rnn.py --new_model --batch_size 200
 # python 04_train_rnn.py --new_model --batch_size 100
 
-from world_model.rnn.arch_v4_cumrew_only import RNN
+from world_model.rnn.arch_v5_cumrew_only_no_action import RNN
 import argparse
 import numpy as np
 import os
